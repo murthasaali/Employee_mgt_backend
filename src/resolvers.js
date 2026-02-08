@@ -1,95 +1,89 @@
 import { ObjectId } from "mongodb";
 import { connectDB } from "./db.js";
 
-export const resolvers = {
+const resolvers = {
   Query: {
-    // ✅ GET ALL EMPLOYEES
-    getAllEmployees: async () => {
-      const db = await connectDB();
+   getAllEmployees: async () => {
+  const db = await connectDB();
+  const employees = await db.collection("employees").find().toArray();
+  console.log("EMPLOYEES FROM DB:", employees);
+  return employees;
+},
 
-      return db
-        .collection("employees")
-        .find({})
-        .toArray();
-    },
 
-    // ✅ GET SINGLE EMPLOYEE
     getEmployeeDetails: async (_, { id }) => {
       if (!ObjectId.isValid(id)) throw new Error("Invalid Employee ID");
 
       const db = await connectDB();
-      return db.collection("employees").findOne({ _id: new ObjectId(id) });
+      return db.collection("employees").findOne({
+        _id: new ObjectId(id),
+      });
     },
 
-    // ✅ FILTER BY DEPARTMENT
     getEmployeesByDepartment: async (_, { department }) => {
       const db = await connectDB();
-
       return db
         .collection("employees")
-        .find({ department })
+        .find({ "department.name": department })
         .toArray();
     },
-
-    // 🔍 SEARCH
-    // searchEmployees: async (_, { keyword }) => {
-    //   const db = await connectDB();
-
-    //   return db
-    //     .collection("employees")
-    //     .find({
-    //       $or: [
-    //         { name: { $regex: keyword, $options: "i" } },
-    //         { position: { $regex: keyword, $options: "i" } },
-    //         { department: { $regex: keyword, $options: "i" } },
-    //       ],
-    //     })
-    //     .toArray();
-    // },
   },
 
   Mutation: {
-    // ✅ ADD EMPLOYEE (SAFE INSERT)
     addEmployee: async (_, { name, position, department, salary }) => {
       const db = await connectDB();
+
+      const dept = await db
+        .collection("departments")
+        .findOne({ name: department });
+
+      if (!dept) throw new Error("Department not found");
 
       const newEmployee = {
         name,
         position,
-        department: department || "General", // fallback
         salary,
+        department: {
+          id: dept._id.toString(),
+          name: dept.name,
+          floor: dept.floor,
+        },
       };
 
-      const result = await db.collection("employees").insertOne(newEmployee);
+      const result = await db
+        .collection("employees")
+        .insertOne(newEmployee);
 
       return {
-        _id: result.insertedId,
+        id: result.insertedId.toString(),
         ...newEmployee,
       };
     },
 
-    // 🗑 DELETE EMPLOYEE
-    deleteEmployee: async (_, { id }) => {
+    // ✅ DELETE MUTATION (correct place)
+    deleteEmployeeById: async (_, { id }) => {
       if (!ObjectId.isValid(id)) throw new Error("Invalid Employee ID");
 
       const db = await connectDB();
-
-      const employee = await db
-        .collection("employees")
-        .findOne({ _id: new ObjectId(id) });
-
-      if (!employee) throw new Error("Employee not found");
-
-      await db.collection("employees").deleteOne({
+      const result = await db.collection("employees").deleteOne({
         _id: new ObjectId(id),
       });
 
-      return employee; // return full deleted employee
+      if (result.deletedCount === 0) {
+        throw new Error("Employee not found");
+      }
+
+      return true;
     },
   },
 
-  // ✅ MAP Mongo _id → GraphQL id
   Employee: {
-    id: (parent) => parent._id?.toString() || parent.id,
+    id: (parent) => parent._id?.toString(),
+  },
+
+  Department: {
+    id: (parent) => parent.id || parent._id?.toString(),
   },
 };
+
+export default resolvers;

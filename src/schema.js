@@ -1,12 +1,18 @@
-import { gql } from "apollo-server";
+import { gql } from "graphql-tag";
 
-export const typeDefs = gql`
+const typeDefs = gql`
   type Employee {
     id: ID!
     name: String!
     position: String!
-    department: String
+    department: Department!
     salary: Int!
+  }
+
+  type Department {
+    id: ID!
+    name: String!
+    floor: Int!
   }
 
   type Query {
@@ -16,13 +22,16 @@ export const typeDefs = gql`
   }
 
   type Mutation {
-    addEmployee(
-      name: String!
-      position: String!
-      department: String!
-      salary: Int!
-    ): Employee!
+  addEmployee(
+    name: String!
+    position: String!
+    department: String!
+    salary: Int!
+  ): Employee!
 
-    deleteEmployee(id: ID!): Employee
-  }
+  deleteEmployeeById(id: ID!): Boolean!
+}
+
 `;
+
+export default typeDefs;
